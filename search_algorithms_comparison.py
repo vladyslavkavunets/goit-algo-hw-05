@@ -115,37 +115,36 @@ def rabin_karp_search(text, pattern):
     
     return -1, comparisons
 
-def read_files_from_links():
+def download_files():
     import urllib.request
     import ssl
+    import os
     
-    # Створюємо SSL контекст, який ігнорує перевірку сертифікатів
+    for filename in ["article1.txt", "article2.txt"]:
+        if os.path.exists(filename):
+            os.remove(filename)
+    
     ssl_context = ssl.create_default_context()
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE
     
-    # Прямі посилання для завантаження з Google Drive
-    direct_links = [
+    links = [
         "https://drive.google.com/uc?export=download&id=18_R5vEQ3eDuy2VdV3K5Lu-R-B-adxXZh",
         "https://drive.google.com/uc?export=download&id=18BfXyQcmuinEI_8KDSnQm4bLx6yIFS_w"
     ]
     
     filenames = ["article1.txt", "article2.txt"]
     
-    print("Завантаження файлів з Google Drive...")
+    print("Завантаження файлів...")
     
-    for i, (link, filename) in enumerate(zip(direct_links, filenames)):
+    for link, filename in zip(links, filenames):
         try:
-            # Створюємо request з SSL контекстом
             opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl_context))
             urllib.request.install_opener(opener)
-            
             urllib.request.urlretrieve(link, filename)
-            print(f"Файл {filename} завантажено")
-            
+            print(f"Файл {filename} завантажено успішно")
         except Exception as e:
             print(f"Помилка завантаження {filename}: {e}")
-            print("Перевірте посилання та з'єднання з інтернетом")
 
 def test_algorithms():
     algorithms = [
@@ -154,33 +153,34 @@ def test_algorithms():
         ("Рабіна-Карпа", rabin_karp_search)
     ]
     
-    read_files_from_links()
+    download_files()
     
     files = [
         ("article1.txt", "Стаття 1"),
         ("article2.txt", "Стаття 2")
     ]
     
-    existing_patterns = ["алгоритм", "структур", "даних", "пошук"]
-    non_existing_patterns = ["відсутній", "неіснуючий"]
+    test_patterns = ["алгоритм", "структур", "даних", "пошук", "відсутній", "неіснуючий"]
     
-    print("ПОРІВНЯННЯ ЕФЕКТИВНОСТІ АЛГОРИТМІВ ПОШУКУ ПІДРЯДКА")
+    print("\nПОРІВНЯННЯ ЕФЕКТИВНОСТІ АЛГОРИТМІВ ПОШУКУ ПІДРЯДКА")
     print("Алгоритми: Боєра-Мура, Кнута-Морріса-Пратта, Рабіна-Карпа")
     print("=" * 80)
     
     all_results = {}
     
     for filename, file_desc in files:
-        with open(filename, "r", encoding="utf-8", errors="ignore") as f:
-            text = f.read()
+        try:
+            with open(filename, "r", encoding="utf-8", errors="ignore") as f:
+                text = f.read()
+        except FileNotFoundError:
+            print(f"Файл {filename} не знайдено")
+            continue
         
         print(f"\n{file_desc}")
         print(f"Розмір тексту: {len(text)} символів")
         print("-" * 80)
         
         file_results = {}
-        
-        test_patterns = existing_patterns + non_existing_patterns
         
         for pattern in test_patterns:
             print(f"\nПошук підрядка: '{pattern}'")
@@ -213,7 +213,7 @@ def test_algorithms():
             most_efficient = min(pattern_results.items(), key=lambda x: x[1]['comparisons'])
             
             print(f"\nНайшвидший: {fastest[0]} ({fastest[1]['time']:.2f} мкс)")
-            print(f"Найменше порівнянь: {most_efficient[0]} ({most_efficient[1]['comparisons']} порівнянь)")
+            print(f"Найефективніший: {most_efficient[0]} ({most_efficient[1]['comparisons']} порівнянь)")
             
             file_results[pattern] = pattern_results
         
@@ -234,13 +234,14 @@ def analyze_results(results):
     wins_comparisons = {alg: 0 for alg in algorithms}
     test_count = 0
     
-    for file_name, file_results in results.items():
-        for pattern, pattern_results in file_results.items():
+    for file_results in results.values():
+        for pattern_results in file_results.values():
             test_count += 1
             
             for alg_name in algorithms:
-                total_time[alg_name] += pattern_results[alg_name]['time']
-                total_comparisons[alg_name] += pattern_results[alg_name]['comparisons']
+                if alg_name in pattern_results:
+                    total_time[alg_name] += pattern_results[alg_name]['time']
+                    total_comparisons[alg_name] += pattern_results[alg_name]['comparisons']
             
             fastest = min(pattern_results.items(), key=lambda x: x[1]['time'])
             most_efficient = min(pattern_results.items(), key=lambda x: x[1]['comparisons'])
@@ -253,9 +254,10 @@ def analyze_results(results):
     print("-" * 55)
     
     for alg in algorithms:
-        avg_time = total_time[alg] / test_count
-        avg_comparisons = total_comparisons[alg] / test_count
-        print(f"{alg:<25} {avg_time:<15.2f} {avg_comparisons:<15.1f}")
+        if test_count > 0:
+            avg_time = total_time[alg] / test_count
+            avg_comparisons = total_comparisons[alg] / test_count
+            print(f"{alg:<25} {avg_time:<15.2f} {avg_comparisons:<15.1f}")
     
     print(f"\nКількість перемог за швидкістю:")
     for alg in algorithms:
@@ -265,19 +267,20 @@ def analyze_results(results):
     for alg in algorithms:
         print(f"{alg}: {wins_comparisons[alg]} з {test_count}")
     
-    best_overall_time = min(total_time.items(), key=lambda x: x[1])
-    best_overall_comparisons = min(total_comparisons.items(), key=lambda x: x[1])
-    
-    print(f"\nНайшвидший загалом: {best_overall_time[0]}")
-    print(f"Найефективніший загалом: {best_overall_comparisons[0]}")
+    if test_count > 0:
+        best_time = min(total_time.items(), key=lambda x: x[1])
+        best_comparisons = min(total_comparisons.items(), key=lambda x: x[1])
+        
+        print(f"\nНайшвидший загалом: {best_time[0]}")
+        print(f"Найефективніший загалом: {best_comparisons[0]}")
 
 def generate_markdown_report(results):
     markdown_content = """# Порівняння ефективності алгоритмів пошуку підрядка
 
 ## Досліджені алгоритми
-- **Боєра-Мура** - використовує таблицю поганих символів
-- **Кнута-Морріса-Пратта (KMP)** - використовує префікс-функцію  
-- **Рабіна-Карпа** - використовує хешування
+- **Боєра-Мура** - використовує таблицю поганих символів для оптимізації пошуку
+- **Кнута-Морріса-Пратта (KMP)** - використовує префікс-функцію для уникнення повторних порівнянь
+- **Рабіна-Карпа** - використовує хешування для швидкого порівняння підрядків
 
 ## Результати тестування
 
@@ -299,14 +302,12 @@ def generate_markdown_report(results):
                     result = f"Позиція {result_data['position']}" if result_data['position'] != -1 else "Не знайдено"
                     markdown_content += f"| {alg_name} | {result_data['time']:.2f} | {result_data['comparisons']} | {result} |\n"
             
-            if pattern_results:
-                fastest = min(pattern_results.items(), key=lambda x: x[1]['time'])
-                most_efficient = min(pattern_results.items(), key=lambda x: x[1]['comparisons'])
-                
-                markdown_content += f"\n**Найшвидший**: {fastest[0]} ({fastest[1]['time']:.2f} мкс)\n"
-                markdown_content += f"**Найефективніший**: {most_efficient[0]} ({most_efficient[1]['comparisons']} порівнянь)\n\n"
+            fastest = min(pattern_results.items(), key=lambda x: x[1]['time'])
+            most_efficient = min(pattern_results.items(), key=lambda x: x[1]['comparisons'])
+            
+            markdown_content += f"\n**Найшвидший**: {fastest[0]} ({fastest[1]['time']:.2f} мкс)\n"
+            markdown_content += f"**Найефективніший**: {most_efficient[0]} ({most_efficient[1]['comparisons']} порівнянь)\n\n"
     
-    # Загальний аналіз
     markdown_content += "## Загальний аналіз\n\n"
     
     total_time = {alg: 0 for alg in algorithms}
@@ -315,8 +316,8 @@ def generate_markdown_report(results):
     wins_comparisons = {alg: 0 for alg in algorithms}
     test_count = 0
     
-    for file_name, file_results in results.items():
-        for pattern, pattern_results in file_results.items():
+    for file_results in results.values():
+        for pattern_results in file_results.values():
             test_count += 1
             
             for alg_name in algorithms:
@@ -347,35 +348,42 @@ def generate_markdown_report(results):
     for alg in algorithms:
         markdown_content += f"| {alg} | {wins_time[alg]}/{test_count} | {wins_comparisons[alg]}/{test_count} |\n"
     
-    best_overall_time = min(total_time.items(), key=lambda x: x[1])
-    best_overall_comparisons = min(total_comparisons.items(), key=lambda x: x[1])
+    if test_count > 0:
+        best_time = min(total_time.items(), key=lambda x: x[1])
+        best_comparisons = min(total_comparisons.items(), key=lambda x: x[1])
+        
+        markdown_content += f"\n**Найшвидший загалом**: {best_time[0]}\n"
+        markdown_content += f"**Найефективніший загалом**: {best_comparisons[0]}\n\n"
     
-    markdown_content += f"\n**Найшвидший загалом**: {best_overall_time[0]}\n"
-    markdown_content += f"**Найефективніший загалом**: {best_overall_comparisons[0]}\n\n"
-    
-    # Висновки
     markdown_content += """## Висновки
 
 1. **Для коротких підрядків** всі алгоритми показують схожі результати
-2. **Боєра-Мура** ефективний для довгих підрядків та великих алфавітів
-3. **KMP** показує стабільні результати незалежно від вхідних даних  
-4. **Рабіна-Карпа** підходить для пошуку кількох підрядків одночасно
-5. **Час виконання** залежить від характеристик тексту та підрядка
+2. **Боєра-Мура** найефективніший для довгих підрядків та великих алфавітів
+3. **KMP** демонструє стабільні результати незалежно від характеристик вхідних даних
+4. **Рабіна-Карпа** оптимальний для одночасного пошуку кількох підрядків
+5. **Час виконання** суттєво залежить від характеристик тексту та шуканого підрядка
 
 ## Рекомендації
 
-- **Для загального використання**: KMP через стабільність
-- **Для довгих шаблонів**: Боєра-Мура  
+- **Для загального використання**: KMP через високу стабільність
+- **Для довгих шаблонів**: Боєра-Мура
 - **Для множинного пошуку**: Рабіна-Карпа
-- **Для простих завдань**: будь-який з алгоритмів підійде
+- **Для простих завдань**: будь-який з представлених алгоритмів
 """
     
-    with open("algorithm_comparison_report.md", "w", encoding="utf-8") as f:
-        f.write(markdown_content)
-    
-    print("Звіт збережено у файл: algorithm_comparison_report.md")
+    try:
+        with open("algorithm_comparison_report.md", "w", encoding="utf-8") as f:
+            f.write(markdown_content)
+        print("Звіт збережено у файл: algorithm_comparison_report.md")
+    except Exception as e:
+        print(f"Помилка створення звіту: {e}")
 
 def main():
+    print("Лабораторна робота №3: Порівняння алгоритмів пошуку підрядка")
+    print("Студент: [Ваше ім'я]")
+    print("Група: [Ваша група]")
+    print("=" * 60)
+    
     results = test_algorithms()
     analyze_results(results)
     generate_markdown_report(results)
@@ -384,10 +392,10 @@ def main():
     print("ВИСНОВКИ")
     print("=" * 80)
     print("1. Для коротких підрядків всі алгоритми показують схожі результати")
-    print("2. Боєра-Мура ефективний для довгих підрядків та великих алфавітів")
-    print("3. KMP показує стабільні результати незалежно від вхідних даних")
-    print("4. Рабіна-Карпа підходить для пошуку кількох підрядків одночасно")
-    print("5. Час виконання залежить від характеристик тексту та підрядка")
+    print("2. Боєра-Мура найефективніший для довгих підрядків та великих алфавітів")
+    print("3. KMP демонструє стабільні результати незалежно від вхідних даних")
+    print("4. Рабіна-Карпа оптимальний для одночасного пошуку кількох підрядків")
+    print("5. Ефективність залежить від характеристик тексту та шуканого підрядка")
 
 if __name__ == "__main__":
     main()
